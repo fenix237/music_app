@@ -31,8 +31,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             
-            // Barre de navigation flottante
-            _buildBottomNavBar(),
           ],
         ),
       ),
@@ -47,7 +45,7 @@ class HomeScreen extends StatelessWidget {
         children: [
           const CircleAvatar(
             radius: 20,
-            backgroundImage: NetworkImage('https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80'), // Image de profil factice
+            backgroundImage: AssetImage('assets/images/profile.jpeg'),
           ),
           Row(
             children: [
@@ -78,7 +76,7 @@ class HomeScreen extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
       child: Text(
-        'Hello, Alex',
+        'Hello, Kyser',
         style: TextStyle(
           fontSize: 28,
           fontWeight: FontWeight.bold,
@@ -157,6 +155,7 @@ class HomeScreen extends StatelessWidget {
       height: 160,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
+        image: DecorationImage(image: AssetImage('assets/images/cover1.jpg'), fit: BoxFit.cover),
         gradient: const LinearGradient(
           colors: [Color(0xFFA838FF), Color(0xFF4B66EA)],
           begin: Alignment.topLeft,
@@ -175,11 +174,11 @@ class HomeScreen extends StatelessWidget {
                 topRight: Radius.circular(24),
                 bottomRight: Radius.circular(24),
               ),
-              child: Image.network(
-                'https://images.unsplash.com/photo-1516280440502-61f22495b6c2?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80',
-                fit: BoxFit.cover,
-                width: 150,
-              ),
+              // child: Image.asset(
+              //       'assets/images/cover1.jpg',
+              //       fit: BoxFit.cover,
+              //       width: 300,
+              //     ),
             ),
           ),
           // Contenu texte et bouton
@@ -227,6 +226,9 @@ class HomeScreen extends StatelessWidget {
       {'title': 'Ocean Eyes', 'artist': 'Soft Vibe', 'color': '0xFF0F2027'},
       {'title': 'Circles Run', 'artist': 'Fan Fav', 'color': '0xFFF2709C'},
       {'title': 'Peaches', 'artist': 'Trending', 'color': '0xFF11998E'},
+      {'title': 'Commando', 'artist': 'Niska', 'color': '0xFF11998E'},
+      {'title': 'Mr sal', 'artist': 'Niska', 'color': '0xFF11998E'},
+
     ];
 
     return Padding(
@@ -287,40 +289,5 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 24),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        width: 260,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A273A).withOpacity(0.9), // Effet de verre sombre
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFA838FF), // Accent violet pour l'onglet actif
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.home_filled, color: Colors.white, size: 24),
-            ),
-            const Icon(Icons.music_note_outlined, color: Colors.white54, size: 28),
-            const Icon(Icons.settings_outlined, color: Colors.white54, size: 28),
-          ],
-        ),
-      ),
-    );
-  }
+  
 }

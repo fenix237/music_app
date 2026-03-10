@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:music_app/Screens/Library.dart';
-import 'package:music_app/Screens/Playing.dart';
+import 'package:music_app/Screens/PlayerScreen.dart';
 
 import 'Screens/HomePage.dart';
+import 'Screens/MainSreen.dart';
 import 'Utils/Theme.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,7 +25,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto', // Vous pouvez utiliser Google Fonts pour plus de précision
       ),
       //theme: themeData,
-     home: const PlayerScreen(),
+     home:  MainScreen(),
     );
   }
 }

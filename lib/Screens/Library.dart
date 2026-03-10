@@ -1,12 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-class LibraryScreen extends StatelessWidget {
+import 'PlayerScreen.dart';
+
+class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key}) : super(key: key);
+
+  @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  // Instance de OnAudioQuery
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+  bool _hasPermission = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissions();
+  }
+
+  // Vérification et demande des permissions
+  Future<void> _checkPermissions() async {
+    // Demande la permission audio (Android 13+) et stockage (Android 12 et -)
+    var storageStatus = await Permission.storage.request();
+    var audioStatus = await Permission.audio.request();
+
+    if (storageStatus.isGranted || audioStatus.isGranted) {
+      setState(() {
+        _hasPermission = true;
+      });
+    } else {
+      // Optionnel : Gérer le refus avec un dialogue ou l'ouverture des paramètres
+      setState(() {
+        _hasPermission = false;
+      });
+    }
+  }
+
+  // Convertisseur de millisecondes en format "Minutes:Secondes"
+  String _formatDuration(int? milliseconds) {
+    if (milliseconds == null) return "0:00";
+    final duration = Duration(milliseconds: milliseconds);
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF120E2B), // Fond sombre cohérent
+      backgroundColor: const Color(0xFF120E2B),
       body: SafeArea(
         child: Stack(
           children: [
@@ -20,15 +66,12 @@ class LibraryScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 _buildCategoryChips(),
                 const SizedBox(height: 20),
-                // Expanded permet à la liste de prendre tout l'espace restant
+                // Affichage de la vraie liste des musiques
                 Expanded(
-                  child: _buildSongList(),
+                  child: _buildRealSongList(),
                 ),
               ],
             ),
-            
-            // Barre de navigation flottante (onglet central actif)
-            _buildBottomNavBar(),
           ],
         ),
       ),
@@ -43,7 +86,7 @@ class LibraryScreen extends StatelessWidget {
         children: [
           const CircleAvatar(
             radius: 20,
-            backgroundImage: NetworkImage('https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=150&q=80'),
+            backgroundImage: AssetImage('assets/images/profile.jpeg'),
           ),
           Row(
             children: [
@@ -88,7 +131,7 @@ class LibraryScreen extends StatelessWidget {
 
   Widget _buildCategoryChips() {
     final categories = ['All', 'Liked Songs', 'Playlists', 'Downloads'];
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -96,8 +139,8 @@ class LibraryScreen extends StatelessWidget {
         children: categories.asMap().entries.map((entry) {
           int index = entry.key;
           String label = entry.value;
-          bool isSelected = index == 0; // "All" est sélectionné par défaut
-          
+          bool isSelected = index == 0;
+
           return Container(
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -121,139 +164,147 @@ class LibraryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSongList() {
-    // Données factices basées sur votre maquette
-    final List<Map<String, String>> songs = [
-      {'title': 'Save Your Tears', 'artist': 'The Weeknd', 'duration': '3:35', 'color': '0xFF5C258D'},
-      {'title': 'Happier Than Ever', 'artist': 'Billie Eilish', 'duration': '4:57', 'color': '0xFF4389A2'},
-      {'title': 'Sunflower', 'artist': 'Post Malone', 'duration': '2:40', 'color': '0xFFF37335'},
-      {'title': 'Believer', 'artist': 'Imagine Dragons', 'duration': '3:25', 'color': '0xFF8A2387'},
-      {'title': 'Positions', 'artist': 'Ariana Grande', 'duration': '3:02', 'color': '0xFF11998E'},
-      {'title': 'Shivers', 'artist': 'Ed Sheeran', 'duration': '3:28', 'color': '0xFFE55D87'},
-      {'title': 'Ghost', 'artist': 'Justin Bieber', 'duration': '3:12', 'color': '0xFF0F2027'},
-    ];
+  // Remplacement par la vraie liste on_audio_query
+  Widget _buildRealSongList() {
+    if (!_hasPermission) {
+      return Center(
+        child: Text(
+          "Permission requise pour lire les fichiers audio.",
+          style: TextStyle(color: Colors.white.withOpacity(0.6)),
+        ),
+      );
+    }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 120), // Padding bas pour la nav bar
-      itemCount: songs.length,
-      itemBuilder: (context, index) {
-        final song = songs[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            children: [
-              // Pochette de l'album (Remplacée par un conteneur coloré pour l'exemple)
-              Container(
-                width: 55,
-                height: 55,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(int.parse(song['color']!)),
-                      Color(int.parse(song['color']!)).withOpacity(0.5)
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+    return FutureBuilder<List<SongModel>>(
+      // ignoreCase, orderType, etc. pourront être modifiés pour le tri plus tard
+      future: _audioQuery.querySongs(
+        ignoreCase: true,
+        orderType: OrderType.ASC_OR_SMALLER,
+        sortType: null,
+        uriType: UriType.EXTERNAL,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFA838FF)));
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text("Erreur: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text("Aucune musique trouvée", style: TextStyle(color: Colors.white)));
+        }
+
+        // On a nos musiques !
+        List<SongModel> songs = snapshot.data!;
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 120),
+          itemCount: songs.length,
+          itemBuilder: (context, index) {
+            final song = songs[index];
+            
+            return InkWell(
+              onTap: () {
+                // TODO: Passer l'URI de la chanson au PlayerScreen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PlayerScreen(),
                   ),
-                ),
-                child: const Icon(Icons.music_note, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              
-              // Titre et Artiste
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
                   children: [
-                    Text(
-                      song['title']!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    // Affiche la pochette de l'album (ou un dégradé par défaut si absente)
+                    QueryArtworkWidget(
+                      id: song.id,
+                      type: ArtworkType.AUDIO,
+                      artworkFit: BoxFit.cover,
+                      nullArtworkWidget: Container(
+                        width: 55,
+                        height: 55,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFA838FF).withOpacity(0.8),
+                              const Color(0xFF2A273A)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Icon(Icons.music_note, color: Colors.white, size: 28),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 16),
+
+                    // Titre et Artiste
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            song.artist ?? "Artiste inconnu",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Durée calculée à partir des millisecondes
                     Text(
-                      song['artist']!,
+                      _formatDuration(song.duration),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
-                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Bouton Play
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
                   ],
                 ),
               ),
-              
-              // Durée
-              Text(
-                song['duration']!,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 16),
-              
-              // Bouton Play
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildBottomNavBar() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 24),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        width: 260,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A273A).withOpacity(0.9), // Effet de verre
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            )
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            const Icon(Icons.home_outlined, color: Colors.white54, size: 28),
-            
-            // Onglet central actif (Musique)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFA838FF), // Accent violet
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.music_note, color: Colors.white, size: 24),
-            ),
-            
-            const Icon(Icons.settings_outlined, color: Colors.white54, size: 28),
-          ],
-        ),
-      ),
-    );
-  }
+  
 }
