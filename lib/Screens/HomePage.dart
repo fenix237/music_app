@@ -152,7 +152,7 @@ class HomeScreen extends StatelessWidget {
   Widget _buildForYouCard() {
     return Container(
       width: 320,
-      height: 160,
+      height: 180,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         image: DecorationImage(image: AssetImage('assets/images/cover1.jpg'), fit: BoxFit.cover),

@@ -6,8 +6,16 @@ import 'Screens/HomePage.dart';
 import 'Screens/MainSreen.dart';
 import 'Utils/Theme.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
-void main() {
+
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+    androidNotificationChannelName: 'Audio playback',
+    androidNotificationOngoing: true,
+  );
   runApp(const MyApp());
 }
 
@@ -19,12 +27,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Music App',
      debugShowCheckedModeBanner: false,
-     theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF120E2B), // Couleur de fond sombre
-        fontFamily: 'Roboto', // Vous pouvez utiliser Google Fonts pour plus de précision
-      ),
-      //theme: themeData,
+    
+      theme: themeData,
      home:  MainScreen(),
     );
   }

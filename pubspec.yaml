@@ -41,6 +41,8 @@ dependencies:
   on_audio_query: ^2.9.0
   just_audio: ^0.9.37
   permission_handler: ^11.0.1
+  just_audio_background: ^0.0.1-beta.11
+  audio_service: ^0.18.16
 
 
 dev_dependencies:

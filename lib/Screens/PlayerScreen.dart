@@ -1,15 +1,155 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+
+import '../Utils/Globals.dart';
 
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({Key? key}) : super(key: key);
+  final List<SongModel> songs; // Liste des chansons
+  final int currentIndex;      // Index actuel
+  final AudioPlayer player;
+
+  const PlayerScreen({
+    Key? key,
+    required this.songs,
+    required this.currentIndex,
+    required this.player,
+  }) : super(key: key);
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
+  late int _currentIndex;
+  StreamSubscription? _playerStateSubscription;
+
+  // --- NOUVELLES VARIABLES D'ÉTAT ---
+
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.currentIndex;
+    
+    // On sauvegarde la souscription pour pouvoir l'annuler à la fermeture de l'écran
+    _playerStateSubscription = widget.player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        _handleSongEnd();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Évite les fuites de mémoire et les sauts de musique multiples
+    _playerStateSubscription?.cancel();
+    super.dispose();
+  }
+
+  // --- LOGIQUE DE LECTURE ---
+
+  void _handleSongEnd() {
+    if (repeatMode == 2) {
+      // Si "Répéter un titre", on relance le même index
+      _loadSong(_currentIndex);
+    } else {
+      // Sinon, comportement normal de passage au suivant (qui inclut le shuffle)
+      _skipNext();
+    }
+  }
+
+  void _toggleShuffle() {
+    setState(() {
+      isShuffle = !isShuffle;
+    });
+  }
+
+  void _toggleRepeat() {
+    setState(() {
+      repeatMode = (repeatMode + 1) % 3; // Passe de 0 -> 1 -> 2 -> 0...
+    });
+  }
+
+  Future<void> _loadSong(int index) async {
+    if (index < 0 || index >= widget.songs.length) return;
+
+    setState(() {
+      _currentIndex = index;
+    });
+
+    try {
+      final song = widget.songs[_currentIndex];
+
+      final source = AudioSource.uri(
+        Uri.parse(song.uri!),
+        tag: MediaItem(
+          id: song.id.toString(),
+          album: song.album ?? "Album inconnu",
+          title: song.title,
+          artist: song.artist ?? "Artiste inconnu",
+          artUri: Uri.parse('content://media/external/audio/media/${song.id}/albumart'),
+        ),
+      );
+
+      await widget.player.setAudioSource(source);
+      widget.player.play();
+      
+    } catch (e) {
+      debugPrint("Erreur changement morceau : $e");
+    }
+  }
+
+  void _skipNext() {
+    if (isShuffle) {
+      // S'il n'y a qu'une seule chanson, on ne fait rien de spécial
+      if (widget.songs.length <= 1) return;
+      
+      int nextIndex;
+      do {
+        nextIndex = Random().nextInt(widget.songs.length);
+      } while (nextIndex == _currentIndex); // S'assure qu'on ne rejoue pas la même
+      
+      _loadSong(nextIndex);
+    } else {
+      if (_currentIndex < widget.songs.length - 1) {
+        _loadSong(_currentIndex + 1);
+      } else if (repeatMode == 1) {
+        // Si on est à la fin et que "Répéter tout" est actif, on retourne au début
+        _loadSong(0);
+      }
+    }
+  }
+
+  void _skipPrevious() {
+    if (isShuffle) {
+      // En mode aléatoire, "précédent" choisit aussi une chanson au hasard
+      _skipNext();
+    } else {
+      if (_currentIndex > 0) {
+        _loadSong(_currentIndex - 1);
+      } else if (repeatMode == 1) {
+        // Si on est au début et que "Répéter tout" est actif, on va à la fin
+        _loadSong(widget.songs.length - 1);
+      }
+    }
+  }
+
+  String _formatDuration(Duration? duration) {
+    if (duration == null) return "0:00";
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentSong = widget.songs[_currentIndex];
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -17,10 +157,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF3E3A6D), // Violet sombre en haut
-              Color(0xFF120E2B), // Noir bleuté en bas
-            ],
+            colors: [Color(0xFF3E3A6D), Color(0xFF120E2B)],
           ),
         ),
         child: SafeArea(
@@ -29,11 +166,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const SizedBox(height: 10),
               _buildAppBar(context),
               const Spacer(),
-              _buildAlbumArt(),
+              _buildStaticAlbumArt(currentSong.id),
               const Spacer(),
-              _buildSongInfo(),
+              _buildSongInfo(currentSong),
               const SizedBox(height: 30),
-              _buildWaveform(),
+              _buildProgressSlider(),
               const SizedBox(height: 40),
               _buildControls(),
               const SizedBox(height: 40),
@@ -51,15 +188,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _buildCircleIcon(Icons.keyboard_arrow_down, () => Navigator.pop(context)),
-          const Text(
-            'Now Playing',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1,
-            ),
-          ),
-          _buildCircleIcon(Icons.share_outlined, () {}),
+          const Text('Now Playing', style: TextStyle(color: Colors.white, letterSpacing: 1)),
+          _buildCircleIcon(Icons.more_vert, () {}),
         ],
       ),
     );
@@ -70,16 +200,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white24),
-        ),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
         child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
 
-  Widget _buildAlbumArt() {
+  Widget _buildStaticAlbumArt(int songId) {
     return Container(
       width: 280,
       height: 280,
@@ -87,101 +214,93 @@ class _PlayerScreenState extends State<PlayerScreen> {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: const Color(0xFFA838FF).withOpacity(0.2),
             blurRadius: 30,
-            offset: const Offset(0, 20),
+            spreadRadius: 5,
           ),
         ],
-        image: const DecorationImage(
-          image: NetworkImage('https://images.unsplash.com/photo-1619983081563-430f63602796?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'),
-          fit: BoxFit.cover,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: QueryArtworkWidget(
+          id: songId,
+          type: ArtworkType.AUDIO,
+          artworkWidth: 280,
+          artworkHeight: 280,
+          artworkFit: BoxFit.cover,
+          nullArtworkWidget: Container(
+            color: Colors.white10,
+            child: const Icon(Icons.music_note, color: Colors.white, size: 100),
+          ),
         ),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Texte superposé "BLINDING LIGHTS" style néon
-          Positioned(
-            child: Text(
-              'BLINDING\nLIGHTS',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: Colors.white.withOpacity(0.9),
-                fontStyle: FontStyle.italic,
-                shadows: [
-                  Shadow(color: Colors.purpleAccent, blurRadius: 15),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSongInfo() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'The Weeknd',
-                style: TextStyle(color: Colors.white60, fontSize: 14),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Blinding Lights',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const Icon(Icons.favorite_border, color: Colors.white70, size: 28),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWaveform() {
+  Widget _buildSongInfo(SongModel song) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         children: [
-          // Simulation de l'onde sonore (Waveform)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: List.generate(40, (index) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                width: 3,
-                height: (index % 5 == 0) ? 40 : (index % 3 == 0) ? 20 : 30,
-                decoration: BoxDecoration(
-                  color: index < 15 ? Colors.white : Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            }),
+          Text(
+            song.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 15),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('1:27', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              Text('2:59', style: TextStyle(color: Colors.white54, fontSize: 12)),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            song.artist ?? "Unknown Artist",
+            style: const TextStyle(color: Colors.white60, fontSize: 16),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProgressSlider() {
+    return StreamBuilder<Duration>(
+      stream: widget.player.positionStream,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final duration = widget.player.duration ?? Duration.zero;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  thumbColor: const Color(0xFFA838FF),
+                  activeTrackColor: const Color(0xFFA838FF),
+                  inactiveTrackColor: Colors.white12,
+                  trackHeight: 4,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                ),
+                child: Slider(
+                  min: 0,
+                  max: duration.inMilliseconds.toDouble(),
+                  value: position.inMilliseconds.toDouble().clamp(0, duration.inMilliseconds.toDouble()),
+                  onChanged: (value) {
+                    widget.player.seek(Duration(milliseconds: value.toInt()));
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_formatDuration(position), style: const TextStyle(color: Colors.white54)),
+                    Text(_formatDuration(duration), style: const TextStyle(color: Colors.white54)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -189,20 +308,65 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          const Icon(Icons.repeat, color: Colors.white54),
-          const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 45),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
+          // BOUTON SHUFFLE
+          IconButton(
+            icon: Icon(
+              Icons.shuffle,
+              color: isShuffle ? const Color(0xFFA838FF) : Colors.white54,
             ),
-            child: const Icon(Icons.pause_rounded, color: Colors.black, size: 35),
+            iconSize: 28,
+            onPressed: _toggleShuffle,
           ),
-          const Icon(Icons.skip_next_rounded, color: Colors.white, size: 45),
-          const Icon(Icons.queue_music_rounded, color: Colors.white54),
+          
+          // BOUTON PRÉCÉDENT
+          IconButton(
+            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
+            iconSize: 45,
+            // Reste actif si on est en boucle, en aléatoire, ou pas au début
+            onPressed: (_currentIndex > 0 || repeatMode == 1 || isShuffle) ? _skipPrevious : null,
+          ),
+          
+          // PLAY / PAUSE
+          StreamBuilder<bool>(
+            stream: widget.player.playingStream,
+            builder: (context, snapshot) {
+              final playing = snapshot.data ?? false;
+              return GestureDetector(
+                onTap: () {
+                  playing ? widget.player.pause() : widget.player.play();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                  child: Icon(
+                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 45,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // BOUTON SUIVANT
+          IconButton(
+            icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+            iconSize: 45,
+            // Reste actif si on est en boucle, en aléatoire, ou pas à la fin
+            onPressed: (_currentIndex < widget.songs.length - 1 || repeatMode == 1 || isShuffle) ? _skipNext : null,
+          ),
+          
+          // BOUTON REPEAT
+          IconButton(
+            icon: Icon(
+              repeatMode == 2 ? Icons.repeat_one : Icons.repeat,
+              color: repeatMode != 0 ? const Color(0xFFA838FF) : Colors.white54,
+            ),
+            iconSize: 28,
+            onPressed: _toggleRepeat,
+          ),
         ],
       ),
     );
