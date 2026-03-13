@@ -5,11 +5,13 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
+import '../Services/LikedSongs.dart';
+import '../Services/RecentSongs.dart';
 import '../Utils/Globals.dart';
 
 class PlayerScreen extends StatefulWidget {
   final List<SongModel> songs; // Liste des chansons
-  final int currentIndex;      // Index actuel
+  final int currentIndex; // Index actuel
   final AudioPlayer player;
 
   const PlayerScreen({
@@ -24,19 +26,15 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late int _currentIndex;
-  StreamSubscription? _playerStateSubscription;
-
   // --- NOUVELLES VARIABLES D'ÉTAT ---
-
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.currentIndex;
-    
+    currentIndex = widget.currentIndex;
+
     // On sauvegarde la souscription pour pouvoir l'annuler à la fermeture de l'écran
-    _playerStateSubscription = widget.player.playerStateStream.listen((state) {
+    playerStateSubscription = widget.player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         _handleSongEnd();
       }
@@ -46,7 +44,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     // Évite les fuites de mémoire et les sauts de musique multiples
-    _playerStateSubscription?.cancel();
+    playerStateSubscription?.cancel();
     super.dispose();
   }
 
@@ -55,7 +53,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _handleSongEnd() {
     if (repeatMode == 2) {
       // Si "Répéter un titre", on relance le même index
-      _loadSong(_currentIndex);
+      _loadSong(currentIndex);
     } else {
       // Sinon, comportement normal de passage au suivant (qui inclut le shuffle)
       _skipNext();
@@ -74,16 +72,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  Future<void> _toggleLike(int songId) async {
+    setState(() {
+      String idStr = songId.toString();
+      if (likedSongIds.contains(idStr)) {
+        likedSongIds.remove(idStr);
+      } else {
+        likedSongIds.add(idStr);
+      }
+    });
+    saveLikedSongs();
+    List<String> likd = await loadLikedSongs();
+    print("La taille des liked songs après toggle: ${likd.length}");
+  }
+
   Future<void> _loadSong(int index) async {
     if (index < 0 || index >= widget.songs.length) return;
 
     setState(() {
-      _currentIndex = index;
+      currentIndex = index;
     });
 
     try {
-      final song = widget.songs[_currentIndex];
-
+      final song = widget.songs[currentIndex];
+      await addToRecent(song.id.toString());
       final source = AudioSource.uri(
         Uri.parse(song.uri!),
         tag: MediaItem(
@@ -91,13 +103,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           album: song.album ?? "Album inconnu",
           title: song.title,
           artist: song.artist ?? "Artiste inconnu",
-          artUri: Uri.parse('content://media/external/audio/media/${song.id}/albumart'),
+          artUri: Uri.parse(
+              'content://media/external/audio/media/${song.id}/albumart'),
         ),
       );
 
       await widget.player.setAudioSource(source);
       widget.player.play();
-      
     } catch (e) {
       debugPrint("Erreur changement morceau : $e");
     }
@@ -107,20 +119,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (isShuffle) {
       // S'il n'y a qu'une seule chanson, on ne fait rien de spécial
       if (widget.songs.length <= 1) return;
-      
+
       int nextIndex;
       do {
         nextIndex = Random().nextInt(widget.songs.length);
-      } while (nextIndex == _currentIndex); // S'assure qu'on ne rejoue pas la même
-      
+      } while (
+          nextIndex == currentIndex); // S'assure qu'on ne rejoue pas la même
+
       _loadSong(nextIndex);
     } else {
-      if (_currentIndex < widget.songs.length - 1) {
-        _loadSong(_currentIndex + 1);
-      } else if (repeatMode == 1) {
-        // Si on est à la fin et que "Répéter tout" est actif, on retourne au début
+      if (currentIndex < widget.songs.length - 1) {
+        _loadSong(currentIndex + 1);
+      } else  {
         _loadSong(0);
-      }
+      }  
+      // } else if (repeatMode == 1) {
+      //   // Si on est à la fin et que "Répéter tout" est actif, on retourne au début
+      //   _loadSong(0);
+      // }
     }
   }
 
@@ -129,12 +145,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // En mode aléatoire, "précédent" choisit aussi une chanson au hasard
       _skipNext();
     } else {
-      if (_currentIndex > 0) {
-        _loadSong(_currentIndex - 1);
-      } else if (repeatMode == 1) {
-        // Si on est au début et que "Répéter tout" est actif, on va à la fin
+      if (currentIndex > 0) {
+         print("next *************************");
+        _loadSong(currentIndex - 1);
+      } else  {
+        print("next *************************");
         _loadSong(widget.songs.length - 1);
       }
+      // } else if (repeatMode == 1) {
+      //   // Si on est au début et que "Répéter tout" est actif, on va à la fin
+      //   _loadSong(widget.songs.length - 1);
+      // }
     }
   }
 
@@ -148,7 +169,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentSong = widget.songs[_currentIndex];
+    final currentSong = widget.songs[currentIndex];
 
     return Scaffold(
       body: Container(
@@ -182,26 +203,40 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Widget _buildAppBar(BuildContext context) {
+    final currentSong = widget.songs[currentIndex];
+    final isLiked = likedSongIds.contains(currentSong.id.toString());
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildCircleIcon(Icons.keyboard_arrow_down, () => Navigator.pop(context)),
-          const Text('Now Playing', style: TextStyle(color: Colors.white, letterSpacing: 1)),
-          _buildCircleIcon(Icons.more_vert, () {}),
+          _buildCircleIcon(Icons.keyboard_arrow_down, Colors.white,
+              () => Navigator.pop(context)),
+          const Text('Now Playing',
+              style: TextStyle(color: Colors.white, letterSpacing: 1)),
+          Row(
+            children: [
+              _buildCircleIcon(
+                  isLiked ? Icons.favorite : Icons.favorite_border,
+                  isLiked ? const Color(0xFFA838FF) : Colors.white,
+                  () => _toggleLike(currentSong.id)),
+                  SizedBox(width: 8,),
+              _buildCircleIcon(Icons.more_vert, Colors.white, () {}),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCircleIcon(IconData icon, VoidCallback onTap) {
+  Widget _buildCircleIcon(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
-        child: Icon(icon, color: Colors.white, size: 20),
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+            shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
@@ -245,7 +280,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Text(
             song.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -276,12 +312,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   activeTrackColor: const Color(0xFFA838FF),
                   inactiveTrackColor: Colors.white12,
                   trackHeight: 4,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 6),
                 ),
                 child: Slider(
                   min: 0,
                   max: duration.inMilliseconds.toDouble(),
-                  value: position.inMilliseconds.toDouble().clamp(0, duration.inMilliseconds.toDouble()),
+                  value: position.inMilliseconds
+                      .toDouble()
+                      .clamp(0, duration.inMilliseconds.toDouble()),
                   onChanged: (value) {
                     widget.player.seek(Duration(milliseconds: value.toInt()));
                   },
@@ -292,8 +331,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(_formatDuration(position), style: const TextStyle(color: Colors.white54)),
-                    Text(_formatDuration(duration), style: const TextStyle(color: Colors.white54)),
+                    Text(_formatDuration(position),
+                        style: const TextStyle(color: Colors.white54)),
+                    Text(_formatDuration(duration),
+                        style: const TextStyle(color: Colors.white54)),
                   ],
                 ),
               ),
@@ -319,15 +360,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
             iconSize: 28,
             onPressed: _toggleShuffle,
           ),
-          
+
           // BOUTON PRÉCÉDENT
           IconButton(
             icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
             iconSize: 45,
             // Reste actif si on est en boucle, en aléatoire, ou pas au début
-            onPressed: (_currentIndex > 0 || repeatMode == 1 || isShuffle) ? _skipPrevious : null,
+            onPressed: (currentIndex > 0 || repeatMode == 1 || isShuffle)
+                ? _skipPrevious
+                : null,
           ),
-          
+
           // PLAY / PAUSE
           StreamBuilder<bool>(
             stream: widget.player.playingStream,
@@ -339,7 +382,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(15),
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                  decoration: const BoxDecoration(
+                      shape: BoxShape.circle, color: Colors.white),
                   child: Icon(
                     playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     color: Colors.black,
@@ -355,9 +399,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
             icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
             iconSize: 45,
             // Reste actif si on est en boucle, en aléatoire, ou pas à la fin
-            onPressed: (_currentIndex < widget.songs.length - 1 || repeatMode == 1 || isShuffle) ? _skipNext : null,
+            onPressed: (currentIndex < widget.songs.length - 1 ||
+                    repeatMode == 1 ||
+                    isShuffle)
+                ? _skipNext
+                : null,
           ),
-          
+
           // BOUTON REPEAT
           IconButton(
             icon: Icon(
