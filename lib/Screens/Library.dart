@@ -104,6 +104,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     super.dispose();
   }
 
+  String removeAccents(String str) {
+    const withDia = 'ÀÁÂÃÄÅàáâãäåÒÓÔÕÖØòóôõöøÈÉÊËèéêëÇçÌÍÎÏìíîïÙÚÛÜùúûüÿÑñ';
+    const withoutDia = 'AAAAAAaaaaaaOOOOOOooooooEEEEeeeeCcIIIIiiiiUUUUuuuuyNn';
+    for (int i = 0; i < withDia.length; i++) {
+      str = str.replaceAll(withDia[i], withoutDia[i]);
+    }
+    return str.toLowerCase();
+  }
+
   // === LOGIQUE DE LECTURE (copiée de PlayerScreen) ===
 
   void _handleSongEnd() {
@@ -117,9 +126,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _loadSong(int index) async {
-    if (index < 0 ||
-        index >= currentPlaylist.length ||
-        currentPlaylist.isEmpty) return;
+    if (index < 0 || index >= currentPlaylist.length || currentPlaylist.isEmpty)
+      return;
 
     setState(() {
       currentIndex = index;
@@ -304,7 +312,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 Expanded(child: _buildRealSongList()),
               ],
             ),
-             _buildMiniPlayer(),
+            _buildMiniPlayer(),
           ],
         ),
       ),
@@ -544,10 +552,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
         // --- SCÉNARIO A : RECHERCHE ACTIVE (GLOBALE SUR TOUT) ---
         if (_searchText.isNotEmpty) {
+          final query = removeAccents(_searchText);
+
           List<SongModel> searchSongs = allSongs.where((song) {
-            final title = song.title.toLowerCase();
-            final artist = (song.artist ?? "").toLowerCase();
-            final query = _searchText.toLowerCase();
+            final title = removeAccents(song.title);
+            final artist = removeAccents(song.artist ?? "");
             return title.contains(query) || artist.contains(query);
           }).toList();
 
@@ -559,27 +568,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
           }
 
           List<String> matchingAlbums = albumMap.keys.where((albumName) {
-            return albumName.toLowerCase().contains(_searchText.toLowerCase());
+            return removeAccents(albumName).contains(query);
           }).toList();
 
           if (searchSongs.isEmpty && matchingAlbums.isEmpty) {
             return const Center(
-                child: Text("Aucun morceau ou album trouvé",
-                    style: TextStyle(color: Colors.white54)));
+              child: Text(
+                "Aucun morceau ou album trouvé",
+                style: TextStyle(color: Colors.white54),
+              ),
+            );
           }
 
           return ListView(
             padding: const EdgeInsets.only(left: 20, right: 20, bottom: 120),
             children: [
-              // --- SECTION MORCEAUX ---
               if (searchSongs.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 15),
-                  child: Text("Titres",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold)),
+                  child: Text(
+                    "Titres",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 ...searchSongs
                     .asMap()
@@ -593,16 +607,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
               if (matchingAlbums.isNotEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 15),
-                  child: Text("Albums",
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold)),
+                  child: Text(
+                    "Albums",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 GridView.builder(
-                  shrinkWrap: true, // Important pour être dans une ListView
-                  physics:
-                      const NeverScrollableScrollPhysics(), // On laisse la ListView gérer le scroll
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 15,
@@ -618,8 +634,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           _selectedAlbumName = name;
                           _selectedCategoryIndex =
                               3; // Bascule sur l'onglet Album
-                          _isSearching =
-                              false; // Ferme la recherche pour voir l'album
+                          _isSearching = false; // Ferme la recherche
                           _searchText = "";
                           _searchController.clear();
                         });
@@ -648,12 +663,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     );
