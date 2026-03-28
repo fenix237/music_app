@@ -552,11 +552,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
         // --- SCÉNARIO A : RECHERCHE ACTIVE (GLOBALE SUR TOUT) ---
         if (_searchText.isNotEmpty) {
           final query = removeAccents(_searchText);
+          final queryWords =
+              query.split(' ').where((word) => word.isNotEmpty).toList();
 
           List<SongModel> searchSongs = allSongs.where((song) {
-            final title = removeAccents(song.title);
-            final artist = removeAccents(song.artist ?? "");
-            return title.contains(query) || artist.contains(query);
+            final songTitle = removeAccents(song.title);
+            final songArtist = removeAccents(song.artist ?? "");
+
+            final combinedInfo = "$songTitle $songArtist";
+
+            return queryWords.every((word) => combinedInfo.contains(word));
           }).toList();
 
           Map<String, List<SongModel>> albumMap = {};
@@ -567,7 +572,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           }
 
           List<String> matchingAlbums = albumMap.keys.where((albumName) {
-            return removeAccents(albumName).contains(query);
+            final cleanedAlbumName = removeAccents(albumName);
+            return queryWords.every((word) => cleanedAlbumName.contains(word));
           }).toList();
 
           if (searchSongs.isEmpty && matchingAlbums.isEmpty) {
