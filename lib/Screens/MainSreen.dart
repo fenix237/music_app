@@ -15,27 +15,21 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentPageIndex = 0;
 
-  // Instance unique du player pour toute l'app
-
   @override
   void initState() {
     super.initState();
-    // On écoute l'état du player pour mettre à jour le mini-lecteur
     audioPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() => isPlaying = state.playing);
     });
 
-    // On écoute le changement de morceau (via les tags MediaItem)
     audioPlayer.sequenceStateStream.listen((state) {
       final tag = state?.currentSource?.tag;
       if (tag != null && mounted) {
-        // Optionnel : Tu peux récupérer l'objet SongModel ici si nécessaire
-        // Pour l'instant on garde la référence mise à jour par les enfants
+
       }
     });
   }
 
-  // Fonction appelée par les pages enfants (Library/Home) pour jouer un son
   void _playSong(SongModel song) {
     setState(() {
       currentSong = song;
@@ -48,17 +42,20 @@ class _MainScreenState extends State<MainScreen> {
       backgroundColor: const Color(0xFF120E2B),
       body: Stack(
         children: [
-          // Les pages de l'app
           IndexedStack(
             index: _currentPageIndex,
-            children: [
-              HomeScreen(),
-              LibraryScreen(), // Passe éventuellement le player en paramètre si besoin
+            children:  [
+              HomeScreen(onTapSearch: () =>
+                setState(() {
+                  isVisibleSearch = true;
+                  _currentPageIndex = 1;
+                })
+              ,),
+              LibraryScreen(), 
               SettingsScreen(),
             ],
           ),
 
-          // LE MINI PLAYER FLOTTANT
           _buildGlobalMiniPlayer(),
         ],
       ),
@@ -204,7 +201,7 @@ class _MainScreenState extends State<MainScreen> {
     return GestureDetector(
       onTap: () => setState(() => _currentPageIndex = index),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 0),
         padding: const EdgeInsets.all(12),
         decoration: isActive
             ? const BoxDecoration(

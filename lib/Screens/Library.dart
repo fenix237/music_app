@@ -28,7 +28,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchText = "";
-  bool _isSearching = false;
   StreamSubscription<String>? _notificationActionSubscription;
   List<String> _currentPathSegments = [];
   int _selectedCategoryIndex = 0;
@@ -429,11 +428,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
             backgroundImage: AssetImage('assets/images/profile.jpeg'),
           ),
           Row(children: [
-            _buildIconButton(_isSearching ? Icons.close : Icons.search,
+            _buildIconButton(isVisibleSearch ? Icons.close : Icons.search,
                 onTap: () {
               setState(() {
-                _isSearching = !_isSearching;
-                if (!_isSearching) {
+                isVisibleSearch = !isVisibleSearch;
+                if (!isVisibleSearch) {
                   _searchController.clear();
                   _searchText = "";
                 }
@@ -461,7 +460,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget _buildTitle() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: _isSearching
+      child: isVisibleSearch
           ? TextField(
               controller: _searchController,
               autofocus: true,
@@ -634,7 +633,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           _selectedAlbumName = name;
                           _selectedCategoryIndex =
                               3; // Bascule sur l'onglet Album
-                          _isSearching = false; // Ferme la recherche
+                          isVisibleSearch = false; // Ferme la recherche
                           _searchText = "";
                           _searchController.clear();
                         });
@@ -866,9 +865,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
             );
           } else {
             // AFFICHER LES SONS DE L'ALBUM SÉLECTIONNÉ
+
             List<SongModel> albumSongs = allSongs
                 .where((s) => (s.album ?? "Inconnu") == _selectedAlbumName)
                 .toList();
+
+            albumSongs.sort((a, b) {
+              int trackA = a.track ?? 0;
+              int trackB = b.track ?? 0;
+              return trackA.compareTo(trackB);
+            });
             return Column(
               children: [
                 ListTile(

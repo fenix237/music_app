@@ -15,3 +15,4 @@ SongModel? currentSong;
 bool isPlaying = false;
 final OnAudioQuery audioQuery = OnAudioQuery();
 StreamSubscription? playerStateSubscription;
+bool isVisibleSearch = false;

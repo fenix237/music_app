@@ -13,15 +13,14 @@ import '../Utils/Globals.dart';
 import 'PlayerScreen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final VoidCallback onTapSearch;
+  HomeScreen({Key? key, required this.onTapSearch}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
-
   bool _isLoading = true;
   List<SongModel> _forYouSongs = [];
   List<SongModel> _recentSongs = [];
@@ -231,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             // LE MINI-PLAYER
-           // _buildMiniPlayer(),
+            // _buildMiniPlayer(),
           ],
         ),
       ),
@@ -250,9 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Row(
             children: [
-              _buildIconButton(Icons.search),
+            
+              _buildIconButton(Icons.search,
+                widget.onTapSearch
+              ),
               const SizedBox(width: 10),
-              _buildIconButton(Icons.notifications_none),
+              _buildIconButton(Icons.notifications_none, () {}),
             ],
           )
         ],
@@ -260,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildIconButton(IconData icon) {
+  Widget _buildIconButton(IconData icon, VoidCallback ontap) {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -268,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: IconButton(
         icon: Icon(icon, color: Colors.white70),
-        onPressed: () {},
+        onPressed: ontap,
       ),
     );
   }
