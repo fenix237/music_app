@@ -1,7 +1,7 @@
 
-# Music App - Flutter Mobile Application
+# Titune - Application mobile de musique
 
-Application mobile de lecture musicale développée avec le framework Flutter. Ce projet se concentre sur la création d'une interface utilisateur immersive et l'implémentation de la logique de contrôle audio.
+Titune, Application mobile de lecture musicale développée avec le framework Flutter. Ce projet se concentre sur la création d'une interface utilisateur immersive et l'implémentation de la logique de contrôle audio.
 
 ## Fonctionnalités Principales
 
