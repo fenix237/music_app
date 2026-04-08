@@ -16,3 +16,6 @@ bool isPlaying = false;
 final OnAudioQuery audioQuery = OnAudioQuery();
 StreamSubscription? playerStateSubscription;
 bool isVisibleSearch = false;
+late ConcatenatingAudioSource audioPlaylist;
+String? selectedPlaylistName; 
+List<String> playlistNames = []; 

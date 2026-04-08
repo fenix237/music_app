@@ -44,6 +44,7 @@ dependencies:
   just_audio_background: ^0.0.1-beta.11
   audio_service: ^0.18.16
   shared_preferences: ^2.0.15
+  app_links: ^3.4.5
 
 
 
