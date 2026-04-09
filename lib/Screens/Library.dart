@@ -98,7 +98,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _loadPlaylistNames() async {
     final playlistManager = PlaylistManager();
-    playlistNames = await playlistManager.getPlaylistNames();
+    playlistNames = await playlistManager.getNonEmptyPlaylists();
     if (mounted) setState(() {});
   }
 
@@ -575,10 +575,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
         children: categories.asMap().entries.map((entry) {
           int index = entry.key;
           String label = entry.value;
-          bool isSelected = index == _selectedCategoryIndex; // Modifié ici
+          bool isSelected = index == _selectedCategoryIndex;
           return GestureDetector(
-            onTap: () =>
-                setState(() => _selectedCategoryIndex = index), // Modifié ici
+            onTap: () => setState(() => _selectedCategoryIndex = index),
             child: Container(
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -1026,41 +1025,136 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   future: PlaylistManager().getPlaylistSongs(name),
                   builder: (ctx, snapshot) {
                     final songCount = snapshot.data?.length ?? 0;
-                    return GestureDetector(
-                      onTap: () => setState(() => selectedPlaylistName = name),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(15),
-                                color: Colors.white.withOpacity(0.05),
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.queue_music,
-                                  color: Color(0xFFA838FF),
-                                  size: 50,
+
+                    
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => selectedPlaylistName = name),
+                        child: Stack(
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(15),
+                                      color: Colors.white.withOpacity(0.05),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.queue_music,
+                                        color: Color(0xFFA838FF),
+                                        size: 50,
+                                      ),
+                                    ),
+                                  ),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                Text("$songCount titres",
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 12)),
+                              ],
+                            ),
+                            // Bouton more_vert en haut à droite
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: PopupMenuButton<String>(
+                                icon: Icon(Icons.more_vert,
+                                    color: Colors.white.withOpacity(0.7),
+                                    size: 18),
+                                onSelected: (value) async {
+                                  if (value == "rename") {
+                                    final success =
+                                        await _showRenamePlaylistDialog(name);
+                                    if (success) {
+                                      _loadPlaylistNames(); // Recharger la liste
+                                    }
+                                  } else if (value == "delete") {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        backgroundColor:
+                                            const Color(0xFF2A273A),
+                                        title: const Text(
+                                            "Supprimer la playlist",
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                        content: Text("Supprimer '$name' ?",
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, false),
+                                            child: const Text("Annuler",
+                                                style: TextStyle(
+                                                    color: Colors.white54)),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, true),
+                                            child: const Text("Supprimer",
+                                                style: TextStyle(
+                                                    color: Color(0xFFA838FF))),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      await PlaylistManager()
+                                          .deletePlaylist(name);
+                                      playlistNames.remove(name);
+                                      if (selectedPlaylistName == name) {
+                                        selectedPlaylistName = null;
+                                      }
+                                      setState(() {});
+                                    }
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: "rename",
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text("Renommer",
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: "delete",
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text("Supprimer",
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                color: const Color(0xFF2A273A),
+                                elevation: 8,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
-                          Text("$songCount titres",
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
-                                  fontSize: 12)),
-                        ],
-                      ),
-                    );
+                          ],
+                        ),
+                      );
+                  
                   },
                 );
               },
@@ -1068,8 +1162,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           } else {
             // AFFICHER LES SONS DE LA PLAYLIST SÉLECTIONNÉE
             return FutureBuilder<List<String>>(
-              future:
-                  PlaylistManager().getPlaylistSongs(selectedPlaylistName!),
+              future: PlaylistManager().getPlaylistSongs(selectedPlaylistName!),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -1081,13 +1174,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 if (songIds.isEmpty) {
                   return Center(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.music_note_outlined,
-                            color: Colors.white24, size: 60),
-                        SizedBox(height: 10),
-                        Text("Aucun morceau dans cette playlist",
-                            style: TextStyle(color: Colors.white54)),
+                        ListTile(
+                          leading:
+                              const Icon(Icons.arrow_back, color: Colors.white),
+                          title: Text(selectedPlaylistName!,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
+                          onTap: () =>
+                              setState(() => selectedPlaylistName = null),
+                        ),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.music_note_outlined,
+                                color: Colors.white24, size: 60),
+                            SizedBox(height: 10),
+                            Text("Aucun morceau dans cette playlist",
+                                style: TextStyle(color: Colors.white54)),
+                          ],
+                        ),
                       ],
                     ),
                   );
@@ -1292,7 +1399,57 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         selectedPlaylistName, song.id.toString());
                     debugPrint(
                         "Musique ajoutée à la playlist '${selectedPlaylistName}': ${song.title}");
+                    _loadPlaylistNames();
+                  }
+                } else if (value == "delete_to_playlist" &&
+                    _selectedCategoryIndex == 4 &&
+                    selectedPlaylistName != null) {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF2A273A),
+                      title: const Text("Retirer de la playlist",
+                          style: TextStyle(color: Colors.white)),
+                      content: Text(
+                          "Retirer '${song.title}' de '${selectedPlaylistName}' ?",
+                          style: TextStyle(color: Colors.white)),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text("Annuler",
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text("Retirer",
+                              style: TextStyle(color: Color(0xFFA838FF))),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    final playlistManager = PlaylistManager();
+                    await playlistManager.removeSongFromPlaylist(
+                        selectedPlaylistName!, song.id.toString());
+
+                    
+                      setState(() {
                         _loadPlaylistNames();
+                      });
+                    
+
+                    // Feedback visuel
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("Retiré de '${selectedPlaylistName}'"),
+                          backgroundColor: const Color(0xFF2A273A),
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    }
                   }
                 }
               },
@@ -1339,6 +1496,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
                 ),
+                if (_selectedCategoryIndex == 4 && selectedPlaylistName != null)
+                  PopupMenuItem(
+                    value: "delete_to_playlist",
+                    child: Text(
+                      "Retirer de la playlist",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
               ],
               color: const Color(0xFF2A273A),
               elevation: 8,
@@ -1545,5 +1713,90 @@ class _LibraryScreenState extends State<LibraryScreen> {
         );
       },
     );
+  }
+
+  Future<bool> _showRenamePlaylistDialog(String currentName) async {
+    final controller = TextEditingController(text: currentName);
+    return await showDialog<bool>(
+          context: context,
+          // isScrollControlled: true,
+          // shape: const RoundedRectangleBorder(
+          //   borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          // ),
+          // backgroundColor: const Color(0xFF120E2B),
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF120E2B),
+            content: Padding(
+              padding:
+                  EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom)
+                      .copyWith(top: 20, left: 16, right: 16, bottom: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Renommer la playlist",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: controller,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Nouveau nom",
+                      hintStyle: TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF2A273A),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text("Annuler",
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFA838FF),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final newName = controller.text.trim();
+                            final success = await PlaylistManager()
+                                .renamePlaylist(currentName, newName);
+                            if (success) {
+                              playlistNames.remove(currentName);
+                              playlistNames.add(newName);
+                              setState(() {});
+                            }
+                            Navigator.pop(ctx, success);
+                          },
+                          child: const Text("Renommer",
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ) ??
+        false;
   }
 }
