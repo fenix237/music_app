@@ -39,6 +39,9 @@ L'organisation du dossier `lib` suit une architecture rigoureuse :
  * Exécution de l'application :
    flutter run
 
+Vous pouvez egalement recuperer l'APK: https://github.com/fenix237/music_app/releases
+
+
 Informations sur l'Auteur
 Dongmo Giresse – Développeur Fullstack Flutter
  * GitHub : fenix237
